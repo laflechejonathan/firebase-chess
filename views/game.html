@@ -1,0 +1,237 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<script src='http://cdnjs.cloudflare.com/ajax/libs/fabric.js/1.6.2/fabric.min.js'></script>
+<script src='https://code.jquery.com/jquery-3.0.0.min.js'></script>
+<script src='https://www.gstatic.com/firebasejs/3.0.5/firebase.js'></script>
+
+<script>
+    $(document).ready(() => {
+
+        // firebase setup
+        var config = {
+            apiKey: 'AIzaSyACofSRECHHqlF7SWrQkr48ZaHX7ps7LYY',
+            authDomain: 'projectId.firebaseapp.com',
+            databaseURL: 'https://chess-game-2dce5.firebaseio.com',
+        };
+        firebase.initializeApp(config);
+
+        // setup fabric canvas
+        const canvas = new fabric.Canvas('canvas');
+        canvas.setWidth(800);
+        canvas.setHeight(800);
+
+        // constants
+        const white = '#F0F0F0'
+        const black = '#4F4F4F';
+        const tileSize = 75;
+
+        // track piece positions for fen generation
+        const pieceArray = [];
+        for (let x = 0; x < 8; ++x) {
+            pieceArray.push([]);
+            for (let y = 0; y < 8; ++y) {
+                pieceArray[x].push(null);
+            }
+        }
+        
+        function positionToIndex(left, top) {
+            let x = (left) / tileSize;
+            let y = (top) / tileSize;
+            if (player === 'black') {
+                y = 7 - y;
+            }
+            console.log(player, left, top);
+            console.log(x, y);
+            return [x, y];
+        }
+
+        // track last selected for moving
+        var lastPiece = null;        
+        function moveLastPiece(tile) {
+            if (lastPiece) {
+                // remove piece
+                const [oldX, oldY] = positionToIndex(lastPiece.left, lastPiece.top);
+                pieceArray[oldX][oldY] = null;
+                console.log(oldX, oldY);
+                canvas.remove(lastPiece);
+
+                // update position
+                lastPiece.setLeft(tile.left);
+                lastPiece.setTop(tile.top);
+
+                // re-add piece
+                const [newX, newY] = positionToIndex(tile.left, tile.top);
+                pieceArray[newX][newY] = lastPiece;
+                lastPiece.selectable = true;
+                canvas.add(lastPiece);
+
+                // unselect piece
+                lastPiece = null;
+
+                newFen = generateFen();
+                newTurn = player === 'white' ? 'black': 'white';
+                firebase.database().ref(`games/${gameId}`).update({
+                    fen: newFen,
+                    turn: newTurn
+                });
+            }
+        }
+
+        function generateFen() {
+            const fen = [];
+            for (let y = 0; y < 8; ++y) {
+                fen.push('');
+                let nullCount = 0;
+                for (let x = 0; x < 8; ++x) {
+                    let piece = pieceArray[x][y];
+                    if (piece === null) {
+                        nullCount += 1;
+                    } else {
+                        if (nullCount > 0) {
+                            fen[y] += nullCount;
+                            nullCount = 0;
+                        }
+                        fen[y] += piece.char;
+                    }                    
+                }
+                if (nullCount > 0) {
+                    fen[y] += nullCount;
+                }
+            }
+
+            console.log(fen);
+            return fen;
+        }
+
+        function renderTiles() {           
+            // render background tiles
+            for (let x = 0; x < 8; ++x) {
+                for (let y = 0; y < 8; ++y) {
+                    let color = null;
+                    if ((x + y) % 2 === 0) {
+                        color = white;
+                    } else {
+                        color = black;
+                    }
+                    const tile = new fabric.Rect({
+                        left: tileSize * x,
+                        top: tileSize * y,
+                        fill: color,
+                        width: tileSize,
+                        height: tileSize,
+                        selectable: true,
+                        hasControls: false,
+                        lockMovementX: true,
+                        lockMovementY: true,
+                    });
+                    tile.on('selected', () => {
+                        moveLastPiece(tile);
+                    });
+                    canvas.add(tile);
+                }
+            }
+        }
+
+        function renderPieces(fen, turn) {
+
+            const pieceURLs = {
+                'K': '/static/white_king.svg',
+                'Q': '/static/white_queen.svg',
+                'N': '/static/white_knight.svg',
+                'B': '/static/white_bishop.svg',
+                'R': '/static/white_rook.svg',
+                'P': '/static/white_pawn.svg',
+                'k': '/static/black_king.svg',
+                'q': '/static/black_queen.svg',
+                'n': '/static/black_knight.svg',
+                'b': '/static/black_bishop.svg',
+                'r': '/static/black_rook.svg',
+                'p': '/static/black_pawn.svg',            
+            }
+
+            for (let row = 0; row < 8; ++row) {
+                rowString = fen[row];
+                let column = 0;
+                for (let i = 0, len = rowString.length; i < len; i++) {
+                    const char = rowString.charAt(i);
+                    const asNum = parseInt(char);
+                    if (isNaN(asNum)) {
+                        let x = column;
+                        let y = row;
+                        const isWhite = char.toUpperCase() === char;
+                        const color = isWhite ? 'white' : 'black';                   
+                        fabric.Image.fromURL(pieceURLs[char], img => {
+                            img.left = tileSize * x;
+                            if (player == 'white') {
+                                img.top = tileSize * y;
+                            } else {
+                                img.top = tileSize * (7 - y);
+                            }
+                            img.height = img.width = tileSize;
+                            img.hasControls = false;
+                            img.lockMovementX = true;
+                            img.lockMovementY = true;
+                            img.selectionBackgroundColor = '#84D9F5';
+                            img.char = char;
+                            img.selectable = false;
+                            if (player == turn && player == color) {
+                                img.selectable = true;
+                            }
+                            img.on('selected', e => {
+                                lastPiece = img;    
+                            });
+
+                            pieceArray[x][y] = img;
+                            canvas.add(img)
+                        });
+                        column += 1;
+                    } else {
+                        column += asNum;                    
+                    }
+                }
+            }
+        }
+
+        renderTiles();
+
+
+        function renderGame(gameObj) {
+            for (let x = 0; x < 8; ++x) {
+                for (let y = 0; y < 8; ++y) {
+                    canvas.remove(pieceArray[x][y]);
+                }
+            }
+            renderPieces(gameObj.fen, gameObj.turn);
+            if (gameObj.turn == player) {
+                $('#turn').text('Your Turn ');
+            } else {
+                $('#turn').text('Opponent Turn ');
+            }
+        }
+
+        // constants from server
+        const gameId = '{{ gameId }}';
+        const player = '{{ player }}';
+
+        // register callback whenever data changes
+        firebase.database().ref(`games/${gameId}`).on('value', snapshot => {
+            console.log(snapshot.val());
+            renderGame(snapshot.val());
+        });
+    });
+</script>
+<style>
+</style>
+{% endblock %}
+
+{% block body %}
+    <h2>
+        <a href="/">Chess!</a>
+        |
+        <span id='turn'>Your Turn </span>
+        |
+        <a href='/game/{{ opponentId }}'>Opponent Link</a>
+    </h2>
+    <canvas id='canvas'></canvas>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block body %}
+    <h2>Chess!</h2>
+    <p>
+        This is a simple app for multiplayer chess. All games are public, if you already know
+        your game ID, you can find your game at: http://chess.jlf-hacks.com/[game-id].
+    </p>
+    <p>
+        Otherwise, you can <a href="/new-game/">create a new game.</a>
+    </p>
+
+    <h2>Recent Games</h2>
+    <table>
+        {% for game in games %}
+            <tr>
+                <td>{{ game.id }}</td>
+                <td><a href="/game/{{ game.id }}_W">White</a></td>
+                <td><a href="/game/{{ game.id }}_B">Black</a></td>
+            </tr>
+        {% endfor %}
+    </table>
+{% endblock %}

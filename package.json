@@ -1,0 +1,21 @@
+{
+  "name": "chess-game",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "chess": "^0.2.7",
+    "express": "^4.14.0",
+    "firebase": "^3.0.5",
+    "mustache-express": "^1.2.2",
+    "shortid": "^2.2.6",
+    "swig": "^1.4.2"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Jonathan Lafleche",
+  "license": "ISC"
+}
