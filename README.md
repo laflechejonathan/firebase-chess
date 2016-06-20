@@ -7,9 +7,11 @@ There is no security nor authentication, all games are public and can be randoml
 enforcement of rules, players are free to place their pieces wherever they want, even if it violates the rules
 of chess.
 
-### How to run
+### Local Dev
 
 ```
 npm install
 node app.js
 ```
+
+### 
